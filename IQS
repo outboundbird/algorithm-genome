@@ -1,0 +1,146 @@
+
+IQS<- function(j, geno.test, impt.test){
+  # insert the indicator for progress here
+  
+  # data management
+  snp <- paste(geno.test[,"CHR"], geno.test[,"POS"], sep = ":")
+  geno.test = data.frame(snp, geno.test, stringsAsFactors = F)
+  
+  # for marker j (for looping index); j indicates the row in the genotyped dataset 
+  ind = geno.test[j, 'snp']
+  # print(paste(j,":",ind))
+  # m.ind<-impt.test$SNP %in% ind 
+  m.ind <- which(impt.test$SNP == ind) ;# index the row in the imputed data ; Here may indicate more than one rows 
+  
+  if(length(m.ind)==0){
+    # some markers were filtered from the HRC panel 
+    marker = geno.test[j,8:ncol(geno.test)]
+    ind = ind
+    N = sum(!is.na(marker))
+    N_miss = sum(is.na(marker))
+    iqs = NA 
+    pa = ifelse(N==0, NA, (length(which(marker==2))*2 + length(which(marker==1)))/(2*N))
+    pa = format(pa, scientific = T)
+    pa_e = NA 
+    flip = NA 
+    multi_allele= NA
+    Pc =NA
+    Po=NA
+    return(c(ind, N, N_miss,iqs,Pc, Po ,pa,pa_e, flip, multi_allele))
+  } else if(length(m.ind) > 0) {
+    # checking strand in the genotyped and imputed datasets
+    str1 <- geno.test[j,c("COUNTED", "ALT" )]
+    str2 <- impt.test[m.ind,c("A1","A2")]
+    
+    multirow <- nrow(str2)
+    if(multirow > 1){
+      warning(paste("Multile alternative alleles detected at locus: ", ind,". Deleting the one without match on original genotype."))
+      # index row to use by comparing the alternative alleles 
+      row.idx <- sapply(1:multirow, function(row){
+        alt.alle <- setdiff(as.vector(str1), as.vector(str2[row,]))
+        ifelse(length(alt.alle)>0, FALSE, TRUE)
+      })
+      str2 = str2[row.idx,]
+      m.ind = m.ind[row.idx]
+      multi_allele= 1
+      
+    } else {
+      str2 = str2
+      multi_allele= 0
+    }
+    
+    # Then checking if the reference strand is flipped 
+    same_strd <-identical(unname(unlist(str1)), unname(unlist(str2)))
+    if(!same_strd){
+      warning(paste0("Not the same strand at site:", ind,". Flipping the reference strand according to the HRC panel (imputed dataset)"))
+      marker= 2 - geno.test[j,8:ncol(geno.test)]
+      flip = 1
+    }else{
+      marker= geno.test[j,8:ncol(geno.test)]
+      flip = 0
+    }
+    # ID for genotypes 
+    # given g=g_i, find the joint distribution in the diagnal of the 3x3 table
+    # margin of rows represent the genotype count for genotyped data: n0., n1., n2
+    # marker is a genotype row that contains all subjects if no missing values
+    g0_id <- names(marker)[marker==0 & !is.na(marker)]
+    g1_id <- names(marker)[marker==1 & !is.na(marker)]
+    g2_id <- names(marker)[marker==2 & !is.na(marker)]
+    
+    # ID for imputed genotypes. Find joint counts nii, i= 0, 1, 2
+    # each column represents the imputed genotype distribution x =0 , 1, 2 
+    # the marginal count for each column is : n.0, n.1, 0.2
+    # for subjects with g=0, find the imputed genotype with x=0 
+    
+    temp_x0 <- lapply(g0_id, function(i) grep(paste0('^',i,'$'), colnames(impt.test))) ; 
+    # col names as: ID1 ID1.1 ID2 ID2.1 corresponding to x=0, x=1 for one individual, selected the exact match 
+    id_x0<-unlist(temp_x0)
+    if(is.null(id_x0) | length(id_x0) == 0){
+      # if n0.=0, set 
+      n00= 0
+      n0.= 0
+    }else{
+      # if n0. !=0, n00= sum(x=0|g=0)
+      n00 = sum(as.vector(impt.test[m.ind,id_x0]))
+      n0. = length(which(marker==0))
+      # n0. = table(t(marker))["0"] ; # might be slightly slower
+    }
+    
+    # for g=1
+    temp_x1 <-lapply(g1_id, function(i) grep(paste0('^',i,'.1$'), colnames(impt.test))); # select subjects with suffix '.1'
+    id_x1 <- unlist(temp_x1)
+    
+    if(is.null(id_x1) | length(id_x1) == 0){
+      n11=0
+      n1.=0
+    }else{
+      n11 = sum(as.vector(impt.test[m.ind,id_x1]))
+      n1. = length(which(marker==1))
+      # n1. = table(t(marker))["1"]
+    }
+    
+    # for g= 2
+    temp_x2 <- lapply(g2_id, grep, colnames(impt.test))
+    id_x2 <- unlist(temp_x2)
+    
+    if(is.null(id_x2) | length(id_x2)==0 ){
+      n2. = 0
+      n22 = 0
+    }else{
+      n2. = length(which(marker == 2))
+      # n2. = table(t(marker))["2"]
+      n22 = n2. - sum(as.vector(impt.test[m.ind,id_x2])); # 1- P(x=0) - P(x=1)
+    }
+    
+    sum_diag = sum(n00, n11, n22)
+    N = n0. + n1. + n2.
+    Po = sum_diag/N
+    
+    # Marginal probabilities for imputed genotype
+    # exclude the individuals who didn't have genotype available from the array
+    na.idx = colnames(marker)[is.na(marker)]; # subjects who had missing data
+    imp.temp = impt.test[m.ind, 4:ncol(impt.test) ]
+    temp.na <- lapply(na.idx, function(i){
+      colnames(imp.temp)[grep(i, colnames(imp.temp))]
+    }  
+    )
+    id.na <- unlist(temp.na)
+    imp <- imp.temp[!colnames(imp.temp) %in% id.na]; # exclude subjects with missing values
+    # marginal probability for imputed genotype 
+    n.0 = sum(imp[,c(TRUE, FALSE)])
+    n.1 = sum(imp[!c(TRUE, FALSE)])
+    n.2 = N - sum(n.0, n.1)
+    
+    numt = n.0*n0. + n.1*n1. + n.2*n2.
+    denom = N*N
+    Pc = numt/ denom 
+    iqs =format((Po-Pc)/(1-Pc),scientific = T)
+    pa = format((2*n2. + n1.)/(2*N),scientific = T)
+    pa_e = format((2*n.2 + n.1)/(2*N),scientific = T)
+    N_miss = length(na.idx)
+    Pc= format(Pc, scientific = T)
+    Po= format(Po, scientific = T)
+    return(c(ind, N, N_miss,iqs,Pc, Po ,pa,pa_e, flip, multi_allele))
+  }
+}
+
