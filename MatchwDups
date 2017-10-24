@@ -1,0 +1,28 @@
+MatchwDups<- function(longdata, shortdata, match.ID= "BP"){
+  dups <- shortdata[,match.ID][which(duplicated(shortdata[,match.ID]))]
+  
+  # uni.pos <- shortdata[,match.ID][!shortdata[,match.ID] %in% dups]
+  dup.pos <- shortdata[,match.ID][shortdata[,match.ID] %in% dups]
+  
+  # head(info[info[,match.ID] %in% dup.pos,])
+  # head(shortdata[shortdata[,match.ID] %in% dup.pos, ])
+  
+  # cbind the markers that were > biallelic 
+  dup1 <- longdata[longdata[,match.ID] %in% dup.pos,]
+  dup2 <- shortdata[shortdata[,match.ID] %in% dup.pos, ]
+  
+  temp = cbind(dup1, dup2)
+  # merge the markers that are biallelic 
+  uniq1 <- longdata[!longdata[,match.ID] %in% dup.pos,]
+  uniq2 <- shortdata[!shortdata[,match.ID] %in% dup.pos, ]
+  
+  temp2 <- merge(uniq1, uniq2, by = "BP", all.x = T)
+  # combine the two parts
+  temp1 = temp[,colnames(temp2)]
+  all.temp = rbind(temp1, temp2)
+  
+  head(all.temp)
+  o <- match(longdata[,match.ID], all.temp[,match.ID])
+  merged = all.temp[o,]
+  return(merged)
+}
