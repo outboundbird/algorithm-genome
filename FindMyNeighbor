@@ -1,0 +1,110 @@
+# The idea: 
+# ref strand: ---^-----^^^---^--    ^<- ref marker
+# inf strand: *********----*****    *<- inf marker
+# merged    : ***o*****^^^-**o**    o<- both markers at this position
+#                j--i--j
+# for marker i  look for the neighboring j ref marker
+
+# starting from the first marker position
+# define the first marker, not necessarily the first row in the data
+# i is the rank of the rows not the position number 
+
+# ================ *data frame* preparation ===========
+
+# variables: 
+# 'source' <- indicating inference or reference; MUST be character string with 'inf' or 'ref'
+# 'pos' <- indicating the BP position; MUST be order from min to max; MUST be numeric 
+
+FindMyNeighbor <- function(data){
+  chr= data
+  idx_mark= as.numeric(rownames(chr[chr$source=="inf",]))
+  i = idx_mark[1] 
+  
+  # define when the loop will stop: when the index hit the last position on the list. Inside the loop the value of i keeps updating until it run out the last position. the reason didn't set as the last position is that I want to include the last position in the output  
+  last.pos <- nrow(chr) 
+  this_is_the_end <- i > last.pos
+  
+  rest<- list()
+  # ==================== begin of the while loop =================
+  
+  while(!this_is_the_end) {
+    
+    # check if this marker is inference or reference. it should be cuz i define the i to be the 1st pos of inference. And it should be consistent with the end!!!<======== (not necessarily if at i+1 row is a reference) 
+    is.marker <- chr[i,"source"] == "inf"
+    # if marker is reference, find the next inference marker 
+    if(!is.marker){
+      warning(paste("Row",i,"is not a inference marker, check data!!"))
+      while(!is.marker){
+        is.marker <- chr[i, "source"] =="inf"
+        if(is.marker) break
+        i = i + 1
+      }
+    }
+    
+    # i should indiate the row of inference marker now 
+    # define the starting point of the inference section i-1 is the backward neighbor reference
+    start_m = i
+    
+    k = i
+    # check if the next position of i is inference marker, if FALSE, stop; if TRUE, continue to the next row
+    
+    while(is.marker & k < last.pos){
+      k = k +1
+      is.marker <- chr[k,"source"]=="inf"
+      if(k == last.pos) break
+    }
+    
+    # this define the forward end of the inference section 
+    if(k == last.pos & is.marker){
+      stop_m = k
+    }else{
+      stop_m = k-1
+    }
+    
+    # find the backward and forward neighbors
+    # backward reference neighbor
+    if(i==1){
+      ref_b_pos= 0
+    }else if(i > 1 & chr[(i-1), "source"]=="ref") {
+      ref_b_pos = chr[(i-1), "pos"]
+    }else{
+      stop(paste("Can't find the backward reference neighbor. Check row number:", i))
+    }
+    # forward reference neighbor
+    if(chr[k,"source"]!="ref" & k == last.pos){
+      warning(paste("No last forward reference neighbor; end of the list:", k,". Set forward neighbor to 0."))
+      ref_f_pos = 0
+    } else if(!is.marker){
+      ref_f_pos = chr[k,"pos"]
+    }else{
+      stop(paste("Error check row number:", k,". Not reference neighbor."))
+    }
+    
+    # calculate the distance between the two neighbors and find the closest neighbor 
+    mark_pos = chr[start_m:stop_m,"pos"] 
+    ll = abs(mark_pos - ref_b_pos)
+    ul = abs(ref_f_pos -mark_pos)
+    
+    dist= cbind(ll, ul)
+    
+    output <- sapply(1: nrow(dist), function(row){
+      idx.min <- which.min(dist[row,])
+      site.close <-c(ref_b_pos, ref_f_pos)[idx.min]
+      site.dist <- min(dist[row,])
+      mark <- mark_pos[row]
+      return(c(mark,site.dist, site.close))
+    })
+    
+    rest[[length(rest)+1]] <- t(output)
+    
+    # stop signal i = last position in the list
+    # if i is at the last row of the data
+    i= k+1
+    this_is_the_end <- i > last.pos
+  }
+  
+  # ================== end of the loop =======================
+  map = do.call('rbind', rest)
+  return(map)
+}
+
