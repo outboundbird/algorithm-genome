@@ -18,6 +18,7 @@
 
 FindMyNeighbor <- function(data){
   chr= data
+  rownames(chr)<-NULL
   idx_mark= as.numeric(rownames(chr[chr$source=="inf",]))
   i = idx_mark[1] 
   
