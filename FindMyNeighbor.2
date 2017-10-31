@@ -79,12 +79,17 @@ FindMyNeighbor.2 <- function(data){
       
       # to avoid zero values (inf marker falls on the ref markers)
       m = k + 1 ; # test if the next position is a ref to make k +1 
-      is.marker <- chr[m, "source"]=="inf"
-      while(is.marker){
-        m = m +1
-        is.marker <- chr[m,"source"]=="inf"
+      
+      if(m < last.pos){
+        is.marker <- chr[m, "source"]=="inf"
+        while(is.marker){
+          m = m +1
+          is.marker <- chr[m,"source"]=="inf"
+        }
+        ref_ff_pos = chr[m, "pos"]; # forward to the next 'ref' row to avoid 0 value
+      }else{
+        ref_ff_pos = NA
       }
-      ref_ff_pos = chr[m, "pos"]; # forward to the next 'ref' row to avoid 0 value
       
       # calculate the distance between the two neighbors and find the closest neighbor 
       mark_pos = chr[start_m:stop_m,"pos"] 
@@ -96,11 +101,11 @@ FindMyNeighbor.2 <- function(data){
       output <- sapply(1: nrow(dist), function(row){
         # find non-zero minimum distance to the neighbor reference
         # if the inf marker falls on the ref marker, this step will find the next nearest ref marker
-        r.min <- min(dist[row,dist[row,] >0])
+        r.min <- min(dist[row,dist[row,] >0], na.rm =T)
         idx.min <-match(r.min, dist[row,])
         site.close <-c(ref_b_pos, ref_f_pos, ref_ff_pos)[idx.min]
         
-        site.dist <- min(dist[row,][dist[row,]>0])
+        site.dist <- min(dist[row,][dist[row,]>0], na.rm=T)
         mark <- mark_pos[row]
         return(c(mark,site.dist, site.close))
       })
