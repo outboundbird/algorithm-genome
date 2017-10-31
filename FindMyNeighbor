@@ -17,7 +17,15 @@
 # need to sort the rownames before running
 
 FindMyNeighbor <- function(data){
-  chr= data
+  chr= data.frame(data, stringsAsFactors = F)
+  
+  for(col in 1:2){
+    ifelse(is.numeric(chr[,col]) , names(chr)[col] <-"pos", names(chr)[col] <-"source")
+  }  
+  
+  # sort data first on position then on source - maker sure 'inf' before 'ref' 
+  chr = chr[order(chr$pos, chr$source),]
+  
   rownames(chr)<-NULL
   idx_mark= as.numeric(rownames(chr[chr$source=="inf",]))
   i = idx_mark[1] 
