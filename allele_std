@@ -1,0 +1,27 @@
+# This file is prepared for checking the bim file from PLINKv1.07 output. 
+# It will unify/standardize A1 A2 allele across multiple datasets. In this example, there are 3 datasets. Therefore when merging
+# across these files, it handle the problem that some of the variants are monomorhpic in one dataset but not the other. See exa-
+# mple below:
+# CHR         ID CM     BP A0 A1 A0 A1 A0 A1
+#  1 exm2268640  0 762320  T  C  T  C  T  C
+#  1      exm41  0 861349  0  C  0  C  0  C
+#  1 exm1916089  0 865545  0  G  0  G  0  G
+#  1      exm44  0 865584  A  G  0  G  0  G
+#  1      exm46  0 865625  0  G  A  G  A  G
+#  1      exm47  0 865628  A  G  0  G  A  G
+#  1      exm51  0 865662  0  G  0  G  0  G
+#  1      exm53  0 865665  0  G  A  G  0  G
+#  1      exm55  0 865694  T  C  T  C  T  C
+# marker exm44, exm46, exm47, exm53 had different ref alleles in three datasets. In order to merge three datasets in PLINK, the 
+# allele should be unified.
+#        ID A0 A1 A0 A1 A0 A1
+#exm2268640  T  C  T  C  T  C
+#     exm41  0  C  0  C  0  C
+#exm1916089  0  G  0  G  0  G
+#     exm44  A  G  A  G  A  G
+#     exm46  A  G  A  G  A  G
+#     exm47  A  G  A  G  A  G
+#     exm51  0  G  0  G  0  G
+#     exm53  A  G  A  G  A  G
+#     exm55  T  C  T  C  T  C
+#     exm56  T  C  T  C  T  C
